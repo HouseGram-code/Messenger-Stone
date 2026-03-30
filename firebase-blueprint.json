@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user profile in the messenger",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID" },
+        "name": { "type": "string", "description": "Display name" },
+        "nickname": { "type": "string", "description": "Unique username/nickname" },
+        "avatar": { "type": "string", "description": "Avatar URL" },
+        "bio": { "type": "string", "description": "User biography" },
+        "isOnline": { "type": "boolean", "description": "Online status" },
+        "lastSeen": { "type": "timestamp", "description": "Last seen timestamp" }
+      },
+      "required": ["uid", "name", "nickname", "avatar", "bio", "isOnline", "lastSeen"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "A chat conversation between users",
+      "type": "object",
+      "properties": {
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Array of user IDs participating in the chat"
+        },
+        "lastMessage": { "type": "string", "description": "Preview of the last message" },
+        "lastMessageTime": { "type": "timestamp", "description": "Timestamp of the last message" },
+        "typing": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" },
+          "description": "Map of user IDs to their typing status"
+        }
+      },
+      "required": ["participants", "lastMessage", "lastMessageTime"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message in a chat",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string", "description": "User ID of the sender" },
+        "text": { "type": "string", "description": "Message content" },
+        "timestamp": { "type": "timestamp", "description": "Time the message was sent" }
+      },
+      "required": ["senderId", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles"
+    },
+    "chats/{chatId}": {
+      "schema": { "$ref": "#/entities/Chat" },
+      "description": "Stores chat metadata"
+    },
+    "chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Stores messages within a chat"
+    }
+  }
+}
