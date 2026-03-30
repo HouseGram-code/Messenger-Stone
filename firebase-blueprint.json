@@ -11,7 +11,8 @@
         "avatar": { "type": "string", "description": "Avatar URL" },
         "bio": { "type": "string", "description": "User biography" },
         "isOnline": { "type": "boolean", "description": "Online status" },
-        "lastSeen": { "type": "timestamp", "description": "Last seen timestamp" }
+        "lastSeen": { "type": "timestamp", "description": "Last seen timestamp" },
+        "lastSeenPrivacy": { "type": "string", "enum": ["everyone", "nobody"], "description": "Privacy setting for last seen status" }
       },
       "required": ["uid", "name", "nickname", "avatar", "bio", "isOnline", "lastSeen"]
     },

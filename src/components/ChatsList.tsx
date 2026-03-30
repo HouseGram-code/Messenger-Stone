@@ -10,9 +10,10 @@ interface ChatsListProps {
   chats: Chat[];
   onSelectChat: (chatId: string) => void;
   currentUser: User;
+  connectionStatus?: string | null;
 }
 
-export const ChatsList = ({ chats, onSelectChat, currentUser }: ChatsListProps) => {
+export const ChatsList = ({ chats, onSelectChat, currentUser, connectionStatus }: ChatsListProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -79,8 +80,9 @@ export const ChatsList = ({ chats, onSelectChat, currentUser }: ChatsListProps) 
 
   const filteredChats = chats.filter(
     (chat) =>
-      chat.otherUser?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      chat.otherUser?.nickname.toLowerCase().includes(searchQuery.toLowerCase())
+      !chat.deletedFor?.includes(currentUser.uid) &&
+      (chat.otherUser?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      chat.otherUser?.nickname.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -90,7 +92,14 @@ export const ChatsList = ({ chats, onSelectChat, currentUser }: ChatsListProps) 
       className="flex flex-col h-full"
     >
       <div className="p-4 pt-6">
-        <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100 mb-4">Чаты</h1>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Чаты</h1>
+          {connectionStatus && (
+            <span className="text-xs font-medium text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 px-2 py-1 rounded-full animate-pulse">
+              {connectionStatus}
+            </span>
+          )}
+        </div>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-stone-400" />
@@ -132,6 +141,12 @@ export const ChatsList = ({ chats, onSelectChat, currentUser }: ChatsListProps) 
             {filteredChats.length > 0 ? (
               filteredChats.map((chat) => {
                 if (!chat.otherUser) return null;
+                
+                const isBlockedByOther = chat.otherUser.blockedUsers?.includes(currentUser.uid);
+                const displayAvatar = isBlockedByOther ? 'https://api.dicebear.com/7.x/avataaars/svg?seed=blocked&backgroundColor=e5e7eb' : chat.otherUser.avatar;
+                const displayName = chat.otherUser.name;
+                const displayOnline = isBlockedByOther ? false : chat.otherUser.isOnline;
+
                 return (
                   <div
                     key={chat.id}
@@ -139,21 +154,28 @@ export const ChatsList = ({ chats, onSelectChat, currentUser }: ChatsListProps) 
                     className="flex items-center px-4 py-3 hover:bg-stone-100 dark:hover:bg-stone-900 cursor-pointer transition-colors"
                   >
                     <div className="relative">
-                      <img src={chat.otherUser.avatar} alt={chat.otherUser.name} className="w-14 h-14 rounded-full object-cover" />
-                      {chat.otherUser.isOnline && (
+                      <img src={displayAvatar} alt={displayName} className="w-14 h-14 rounded-full object-cover" />
+                      {displayOnline && (
                         <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-white dark:border-stone-950 rounded-full"></div>
                       )}
                     </div>
                     <div className="ml-4 flex-1 min-w-0">
                       <div className="flex justify-between items-baseline">
-                        <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100 truncate">{chat.otherUser.name}</h3>
+                        <h3 className="text-base font-semibold text-stone-900 dark:text-stone-100 truncate">{displayName}</h3>
                         <span className="text-xs text-stone-500 dark:text-stone-400 ml-2 whitespace-nowrap">
                           {formatTime(chat.lastMessageTime)}
                         </span>
                       </div>
-                      <p className="text-sm text-stone-500 dark:text-stone-400 truncate mt-0.5">
-                        {chat.lastMessage || 'Нет сообщений'}
-                      </p>
+                      <div className="flex justify-between items-center mt-0.5">
+                        <p className="text-sm text-stone-500 dark:text-stone-400 truncate pr-2">
+                          {chat.lastMessage || 'Нет сообщений'}
+                        </p>
+                        {(chat.unreadCount?.[currentUser.uid] || 0) > 0 && (
+                          <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                            {chat.unreadCount![currentUser.uid]}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

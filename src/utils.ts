@@ -1,18 +1,31 @@
 import { Timestamp } from 'firebase/firestore';
+import { isToday, isYesterday, format } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 export function formatLastSeen(timestamp?: Timestamp): string {
-  if (!timestamp) return 'Была в сети дальше';
+  if (!timestamp) return 'был(а) недавно';
   const date = timestamp.toDate();
-  const diffMs = Date.now() - date.getTime();
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
 
-  if (diffMins < 1) return 'Была в сети только что';
-  if (diffMins < 60) return `Была в сети ${diffMins} мин. назад`;
-  if (diffHours < 24) return `Была в сети ${diffHours} ч. назад`;
-  if (diffDays === 1) return 'Была в сети вчера';
-  return 'Была в сети дальше';
+  if (diffMins < 1) return 'был(а) только что';
+  if (diffMins < 60) {
+    // Basic pluralization for minutes
+    let minStr = 'минут';
+    if (diffMins % 10 === 1 && diffMins % 100 !== 11) minStr = 'минуту';
+    else if ([2, 3, 4].includes(diffMins % 10) && ![12, 13, 14].includes(diffMins % 100)) minStr = 'минуты';
+    return `был(а) ${diffMins} ${minStr} назад`;
+  }
+  if (diffHours < 24 && isToday(date)) {
+    return `был(а) сегодня в ${format(date, 'HH:mm')}`;
+  }
+  if (isYesterday(date)) {
+    return `был(а) вчера в ${format(date, 'HH:mm')}`;
+  }
+  
+  return `был(а) ${format(date, 'd MMM в HH:mm', { locale: ru })}`;
 }
 
 export function formatTime(timestamp?: Timestamp): string {

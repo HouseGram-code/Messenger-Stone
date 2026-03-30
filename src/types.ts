@@ -8,6 +8,20 @@ export interface User {
   bio: string;
   isOnline: boolean;
   lastSeen: Timestamp;
+  balance?: number;
+  blockedUsers?: string[];
+  lastSeenPrivacy?: 'everyone' | 'nobody';
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: string[];
+}
+
+export interface Poll {
+  question: string;
+  options: PollOption[];
 }
 
 export interface Message {
@@ -15,6 +29,14 @@ export interface Message {
   senderId: string;
   text: string;
   timestamp: Timestamp;
+  isEdited?: boolean;
+  isDeleted?: boolean;
+  deletedFor?: string[];
+  type?: 'text' | 'poll' | 'image' | 'video' | 'audio' | 'file' | 'sticker' | 'gif';
+  poll?: Poll;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
 }
 
 export interface Chat {
@@ -23,6 +45,8 @@ export interface Chat {
   lastMessage: string;
   lastMessageTime: Timestamp;
   typing?: { [uid: string]: boolean };
+  unreadCount?: { [uid: string]: number };
+  deletedFor?: string[];
   // Client-side only properties for UI
   otherUser?: User;
 }

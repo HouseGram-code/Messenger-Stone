@@ -5,9 +5,10 @@
 
 import { useState, useEffect } from 'react';
 import { MessageCircle, Settings as SettingsIcon } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { doc, onSnapshot, collection, query, where, orderBy, getDocs, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { db, auth } from './firebase';
 import { User, Chat } from './types';
 import { ChatsList } from './components/ChatsList';
 import { ChatWindow } from './components/ChatWindow';
@@ -20,9 +21,45 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [localUid, setLocalUid] = useState<string | null>(localStorage.getItem('messenger_uid'));
+  const [localUid, setLocalUid] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isConnecting, setIsConnecting] = useState(true);
 
-  // Listen to auth state from localStorage
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsConnecting(true);
+      setTimeout(() => setIsConnecting(false), 1500);
+      setIsOnline(true);
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Initial connection simulation
+    setTimeout(() => setIsConnecting(false), 1000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Listen to Firebase auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setLocalUid(user.uid);
+      } else {
+        setLocalUid(null);
+        setCurrentUser(null);
+        setIsAuthReady(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Listen to user profile from Firestore
   useEffect(() => {
     if (localUid) {
       // Fetch user profile
@@ -31,10 +68,6 @@ export default function App() {
         if (docSnap.exists()) {
           setCurrentUser(docSnap.data() as User);
         } else {
-          // If user document doesn't exist but localUid does, we might be in a weird state
-          // Let's sign out to force them to register again
-          localStorage.removeItem('messenger_uid');
-          setLocalUid(null);
           setCurrentUser(null);
         }
         setIsAuthReady(true);
@@ -52,9 +85,6 @@ export default function App() {
       });
 
       return () => unsubUser();
-    } else {
-      setCurrentUser(null);
-      setIsAuthReady(true);
     }
   }, [localUid]);
 
@@ -125,9 +155,23 @@ export default function App() {
   }, [currentUser]);
 
   if (!isAuthReady) {
-    return <div className="min-h-screen bg-stone-200 dark:bg-black flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-stone-900 border-t-transparent rounded-full animate-spin"></div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-emerald-500 flex flex-col items-center justify-center">
+        <motion.div 
+          animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }} 
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="text-white text-6xl mb-4 shadow-lg rounded-full bg-white/20 p-4"
+        >
+          🪨
+        </motion.div>
+        <h1 className="text-white text-2xl font-bold tracking-wider">Messenger Stone</h1>
+        <div className="mt-8 flex space-x-2">
+          <div className="w-3 h-3 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-3 h-3 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-3 h-3 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+        </div>
+      </div>
+    );
   }
 
   if (!currentUser) {
@@ -146,7 +190,8 @@ export default function App() {
             <ChatsList 
               chats={chats} 
               onSelectChat={setActiveChatId} 
-              currentUser={currentUser} 
+              currentUser={currentUser}
+              connectionStatus={!isOnline ? 'Ожидание сети...' : isConnecting ? 'Обновление...' : null}
             />
           )}
           {activeTab === 'settings' && (
