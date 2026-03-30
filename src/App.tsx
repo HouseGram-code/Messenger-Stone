@@ -6,9 +6,8 @@
 import { useState, useEffect } from 'react';
 import { MessageCircle, Settings as SettingsIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
-import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot, collection, query, where, orderBy, getDocs, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { db } from './firebase';
 import { User, Chat } from './types';
 import { ChatsList } from './components/ChatsList';
 import { ChatWindow } from './components/ChatWindow';
@@ -21,42 +20,43 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [localUid, setLocalUid] = useState<string | null>(localStorage.getItem('messenger_uid'));
 
-  // Listen to auth state
+  // Listen to auth state from localStorage
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Fetch user profile
-        const userRef = doc(db, 'users', user.uid);
-        const unsubUser = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            setCurrentUser(docSnap.data() as User);
-          } else {
-            // If user document doesn't exist but auth does, we might be in a weird state
-            // Let's sign out to force them to register again
-            auth.signOut();
-            setCurrentUser(null);
-          }
-          setIsAuthReady(true);
-        });
-        
-        // Set online status
-        updateDoc(userRef, {
-          isOnline: true,
-          lastSeen: serverTimestamp()
-        }).catch(() => {
-          // Ignore error if document doesn't exist yet (e.g., during registration)
-        });
-
-        return () => unsubUser();
-      } else {
-        setCurrentUser(null);
+    if (localUid) {
+      // Fetch user profile
+      const userRef = doc(db, 'users', localUid);
+      const unsubUser = onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setCurrentUser(docSnap.data() as User);
+        } else {
+          // If user document doesn't exist but localUid does, we might be in a weird state
+          // Let's sign out to force them to register again
+          localStorage.removeItem('messenger_uid');
+          setLocalUid(null);
+          setCurrentUser(null);
+        }
         setIsAuthReady(true);
-      }
-    });
+      }, (error) => {
+        console.error("Error fetching user:", error);
+        setIsAuthReady(true);
+      });
+      
+      // Set online status
+      updateDoc(userRef, {
+        isOnline: true,
+        lastSeen: serverTimestamp()
+      }).catch(() => {
+        // Ignore error if document doesn't exist yet (e.g., during registration)
+      });
 
-    return () => unsubscribe();
-  }, []);
+      return () => unsubUser();
+    } else {
+      setCurrentUser(null);
+      setIsAuthReady(true);
+    }
+  }, [localUid]);
 
   // Handle presence (online/offline)
   useEffect(() => {
@@ -131,7 +131,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <Login />;
+    return <Login onLogin={setLocalUid} />;
   }
 
   const activeChat = chats.find(c => c.id === activeChatId);

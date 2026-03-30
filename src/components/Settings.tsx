@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Camera, Edit2, Check, LogOut } from 'lucide-react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { db } from '../firebase';
 import { User } from '../types';
 import { motion } from 'motion/react';
 
@@ -42,7 +42,8 @@ export const Settings = ({ user }: SettingsProps) => {
     } catch (error) {
       console.error("Error updating offline status:", error);
     }
-    auth.signOut();
+    localStorage.removeItem('messenger_uid');
+    window.location.reload();
   };
 
   return (

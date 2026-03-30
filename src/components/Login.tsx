@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { signInAnonymously } from 'firebase/auth';
+import { v4 as uuidv4 } from 'uuid';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { db } from '../firebase';
 import { motion } from 'motion/react';
 
-export const Login = () => {
+export const Login = ({ onLogin }: { onLogin: (uid: string) => void }) => {
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -21,9 +21,11 @@ export const Login = () => {
     setError('');
 
     try {
-      // Sign in anonymously
-      const userCredential = await signInAnonymously(auth);
-      const uid = userCredential.user.uid;
+      let uid = localStorage.getItem('messenger_uid');
+      if (!uid) {
+        uid = uuidv4();
+        localStorage.setItem('messenger_uid', uid);
+      }
 
       // Create user profile in Firestore
       await setDoc(doc(db, 'users', uid), {
@@ -35,13 +37,11 @@ export const Login = () => {
         isOnline: true,
         lastSeen: serverTimestamp(),
       });
+      
+      onLogin(uid);
     } catch (err: any) {
       console.error('Login error:', err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setError('Анонимная авторизация отключена. Пожалуйста, включите её в Firebase Console.');
-      } else {
-        setError('Произошла ошибка при входе. Попробуйте еще раз.');
-      }
+      setError('Ошибка сети. Проверьте подключение к интернету или VPN.');
       setIsLoading(false);
     }
   };
