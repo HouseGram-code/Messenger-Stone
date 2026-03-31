@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowLeft, Send, Info, MoreVertical, Edit2, Trash2, X, Volume2, BarChart2, Plus, Minus, Paperclip, Image as ImageIcon, Music, File as FileIcon, Smile } from 'lucide-react';
+import { ArrowLeft, Send, Info, MoreVertical, Edit2, Trash2, X, Volume2, BarChart2, Plus, Minus, Paperclip, Image as ImageIcon, Music, File as FileIcon, Smile, Check } from 'lucide-react';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, arrayUnion, getDocs } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -57,6 +57,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onBac
   // Media picker state
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [pickerTab, setPickerTab] = useState<'emoji' | 'stickers' | 'gifs'>('emoji');
+  
+  // Sticker creation state
+  const [showCreateStickerModal, setShowCreateStickerModal] = useState(false);
+  const [newStickerName, setNewStickerName] = useState('');
+  const [newStickerFile, setNewStickerFile] = useState<File | null>(null);
+  const [isCreatingSticker, setIsCreatingSticker] = useState(false);
+  const [showStickerSavedToast, setShowStickerSavedToast] = useState(false);
+  const stickerInputRef = useRef<HTMLInputElement>(null);
   
   // Attachment state
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -326,6 +334,70 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onBac
       });
     } catch (error) {
       console.error(`Error sending ${type}:`, error);
+    }
+  };
+
+  const handleCreateSticker = async () => {
+    if (!newStickerName.trim() || !newStickerFile) return;
+    setIsCreatingSticker(true);
+
+    try {
+      const imageCompression = (await import('browser-image-compression')).default;
+      const options = {
+        maxSizeMB: 0.5,
+        maxWidthOrHeight: 512,
+        useWebWorker: true,
+      };
+      const compressedFile = await imageCompression(newStickerFile, options);
+      
+      const reader = new FileReader();
+      const downloadURL = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(compressedFile);
+      });
+
+      const newSticker = {
+        id: Date.now().toString(),
+        name: newStickerName.trim(),
+        url: downloadURL
+      };
+
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        stickers: arrayUnion(newSticker)
+      });
+
+      setShowCreateStickerModal(false);
+      setNewStickerName('');
+      setNewStickerFile(null);
+    } catch (error) {
+      console.error('Error creating sticker:', error);
+      alert('Ошибка при создании стикера.');
+    } finally {
+      setIsCreatingSticker(false);
+    }
+  };
+
+  const handleSaveSticker = async (url: string) => {
+    try {
+      if (currentUser.stickers?.some(s => s.url === url)) {
+        setShowStickerSavedToast(true);
+        setTimeout(() => setShowStickerSavedToast(false), 3000);
+        return;
+      }
+
+      const newSticker = {
+        id: Date.now().toString(),
+        name: 'Сохраненный стикер',
+        url: url
+      };
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        stickers: arrayUnion(newSticker)
+      });
+      setShowStickerSavedToast(true);
+      setTimeout(() => setShowStickerSavedToast(false), 3000);
+    } catch (error) {
+      console.error('Error saving sticker:', error);
     }
   };
 
@@ -800,17 +872,40 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onBac
                     )}
                     
                     {pickerTab === 'stickers' && (
-                      <div className="grid grid-cols-4 gap-2 p-2">
-                        {STICKERS.map((sticker, idx) => (
+                      <div className="flex flex-col h-full">
+                        <div className="p-2 border-b border-stone-100 dark:border-stone-800">
                           <button
-                            key={idx}
                             type="button"
-                            onClick={() => handleSendMedia(sticker, 'sticker')}
-                            className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors"
+                            onClick={() => setShowCreateStickerModal(true)}
+                            className="w-full py-2 bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 rounded-xl font-medium hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors flex items-center justify-center"
                           >
-                            <img src={sticker} alt="sticker" className="w-full h-auto" />
+                            <Plus className="w-4 h-4 mr-2" />
+                            Создать свой стикер
                           </button>
-                        ))}
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 grid grid-cols-4 gap-2 content-start">
+                          {currentUser.stickers?.map((sticker) => (
+                            <button
+                              key={sticker.id}
+                              type="button"
+                              onClick={() => handleSendMedia(sticker.url, 'sticker')}
+                              className="p-2 hover:bg-stone-100 dark:bg-stone-800/50 dark:hover:bg-stone-800 rounded-xl transition-colors relative group"
+                              title={sticker.name}
+                            >
+                              <img src={sticker.url} alt={sticker.name} className="w-full h-auto" />
+                            </button>
+                          ))}
+                          {STICKERS.map((sticker, idx) => (
+                            <button
+                              key={`default-${idx}`}
+                              type="button"
+                              onClick={() => handleSendMedia(sticker, 'sticker')}
+                              className="p-2 hover:bg-stone-100 dark:hover:bg-stone-800 rounded-xl transition-colors"
+                            >
+                              <img src={sticker} alt="sticker" className="w-full h-auto" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                     
@@ -923,6 +1018,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onBac
         )}
       </AnimatePresence>
 
+      {/* Sticker Saved Toast */}
+      <AnimatePresence>
+        {showStickerSavedToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-[90] bg-emerald-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center space-x-4"
+          >
+            <span className="text-sm font-medium">Стикер сохранен!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Message Context Menu Modal */}
       <AnimatePresence>
         {selectedMessage && (
@@ -945,6 +1054,25 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onBac
                 <p className="text-sm text-stone-500 dark:text-stone-400 truncate">{selectedMessage.text}</p>
               </div>
               <div className="flex flex-col">
+                {selectedMessage.type === 'sticker' && selectedMessage.fileUrl && (
+                  <button
+                    onClick={() => {
+                      handleSaveSticker(selectedMessage.fileUrl!);
+                      setSelectedMessage(null);
+                    }}
+                    disabled={currentUser.stickers?.some(s => s.url === selectedMessage.fileUrl)}
+                    className="flex items-center px-6 py-4 text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {currentUser.stickers?.some(s => s.url === selectedMessage.fileUrl) ? (
+                      <Check className="w-5 h-5 mr-3 text-emerald-500" />
+                    ) : (
+                      <Plus className="w-5 h-5 mr-3 text-emerald-500" />
+                    )}
+                    <span className="font-medium">
+                      {currentUser.stickers?.some(s => s.url === selectedMessage.fileUrl) ? 'Стикер уже сохранен' : 'Сохранить стикер'}
+                    </span>
+                  </button>
+                )}
                 {selectedMessage.senderId === currentUser.uid && selectedMessage.type !== 'poll' && (
                   <button
                     onClick={() => startEditing(selectedMessage)}
@@ -1229,6 +1357,83 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ chat, currentUser, onBac
                   className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors shadow-sm disabled:opacity-50"
                 >
                   Создать
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Sticker Modal */}
+      <AnimatePresence>
+        {showCreateStickerModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setShowCreateStickerModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white dark:bg-stone-900 rounded-2xl p-6 w-full max-w-sm shadow-xl"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold text-stone-900 dark:text-stone-100 mb-4">Создать стикер</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-1">Название стикера</label>
+                  <input
+                    type="text"
+                    value={newStickerName}
+                    onChange={(e) => setNewStickerName(e.target.value)}
+                    placeholder="Например: Мой кот"
+                    className="w-full px-4 py-2 bg-stone-100 dark:bg-stone-800 border border-transparent dark:border-stone-700 rounded-xl text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-1">Изображение</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={stickerInputRef}
+                    onChange={(e) => setNewStickerFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                  <div 
+                    onClick={() => stickerInputRef.current?.click()}
+                    className="w-full h-32 border-2 border-dashed border-stone-300 dark:border-stone-700 rounded-xl flex items-center justify-center cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors overflow-hidden"
+                  >
+                    {newStickerFile ? (
+                      <img src={URL.createObjectURL(newStickerFile)} alt="preview" className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="flex flex-col items-center text-stone-500">
+                        <ImageIcon className="w-8 h-8 mb-2 opacity-50" />
+                        <span className="text-sm font-medium">Выбрать фото</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowCreateStickerModal(false);
+                    setNewStickerName('');
+                    setNewStickerFile(null);
+                  }}
+                  className="flex-1 py-3 bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 rounded-xl font-medium hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleCreateSticker}
+                  disabled={!newStickerName.trim() || !newStickerFile || isCreatingSticker}
+                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isCreatingSticker ? 'Сохранение...' : 'Сохранить'}
                 </button>
               </div>
             </motion.div>

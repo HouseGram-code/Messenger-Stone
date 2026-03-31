@@ -12,7 +12,19 @@
         "bio": { "type": "string", "description": "User biography" },
         "isOnline": { "type": "boolean", "description": "Online status" },
         "lastSeen": { "type": "timestamp", "description": "Last seen timestamp" },
-        "lastSeenPrivacy": { "type": "string", "enum": ["everyone", "nobody"], "description": "Privacy setting for last seen status" }
+        "lastSeenPrivacy": { "type": "string", "enum": ["everyone", "nobody"], "description": "Privacy setting for last seen status" },
+        "stickers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          },
+          "description": "User's saved custom stickers"
+        }
       },
       "required": ["uid", "name", "nickname", "avatar", "bio", "isOnline", "lastSeen"]
     },

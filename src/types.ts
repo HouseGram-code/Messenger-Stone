@@ -11,6 +11,7 @@ export interface User {
   balance?: number;
   blockedUsers?: string[];
   lastSeenPrivacy?: 'everyone' | 'nobody';
+  stickers?: { id: string; name: string; url: string }[];
 }
 
 export interface PollOption {

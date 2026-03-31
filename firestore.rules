@@ -20,7 +20,7 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'name', 'nickname', 'avatar', 'bio', 'isOnline', 'lastSeen', 'balance', 'blockedUsers', 'lastSeenPrivacy']) &&
+      return hasOnlyAllowedFields(['uid', 'name', 'nickname', 'avatar', 'bio', 'isOnline', 'lastSeen', 'balance', 'blockedUsers', 'lastSeenPrivacy', 'stickers']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
              data.name is string && data.name.size() > 0 && data.name.size() <= 50 &&
              data.nickname is string && data.nickname.size() > 0 && data.nickname.size() <= 30 &&
@@ -30,7 +30,8 @@ service cloud.firestore {
              data.lastSeen is timestamp &&
              (!('balance' in data) || data.balance is number) &&
              (!('blockedUsers' in data) || data.blockedUsers is list) &&
-             (!('lastSeenPrivacy' in data) || data.lastSeenPrivacy in ['everyone', 'nobody']);
+             (!('lastSeenPrivacy' in data) || data.lastSeenPrivacy in ['everyone', 'nobody']) &&
+             (!('stickers' in data) || data.stickers is list);
     }
 
     function isValidChat(data) {
